@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Handwritten Digit Recognition AI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app-wrapper">
+    <!-- Header -->
+    <header class="header">
+      <div class="header-content">
+        <div class="logo-group">
+          <div class="logo-icon">
+            <span>0-9</span>
+          </div>
+          <div>
+            <h1 class="title">Handwritten Digit Recognition AI</h1>
+            <p class="subtitle">PyTorch MLP Neural Network · MNIST 97.8% Accuracy</p>
+          </div>
+        </div>
+        <div class="status-pill" id="system-status">
+          <span class="status-dot"></span>
+          <span class="status-text" id="status-text">Connecting...</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <main class="main-container">
+      <!-- Left Column: Canvas Drawing Area -->
+      <section class="card canvas-section">
+        <div class="card-header">
+          <div class="card-title-group">
+            <h2 class="card-title">Draw Digit</h2>
+            <span class="badge">Canvas</span>
+          </div>
+          <div class="stroke-controls">
+            <label for="stroke-width" class="control-label">Stroke:</label>
+            <input type="range" id="stroke-width" min="10" max="30" value="18" title="Adjust stroke thickness" />
+            <span id="stroke-val" class="control-val">18px</span>
+          </div>
+        </div>
+
+        <div class="canvas-container">
+          <canvas id="digit-canvas" width="280" height="280"></canvas>
+          <div class="canvas-guide-overlay" id="guide-overlay">
+            <div class="guide-box"></div>
+          </div>
+          <div class="canvas-watermark" id="canvas-watermark">
+            <span>Draw a digit (0–9) here</span>
+          </div>
+        </div>
+
+        <div class="canvas-actions">
+          <button id="clear-btn" class="btn btn-secondary" title="Clear canvas">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 6h18"></path>
+              <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
+              <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+              <line x1="10" y1="11" x2="10" y2="17"></line>
+              <line x1="14" y1="11" x2="14" y2="17"></line>
+            </svg>
+            Clear
+          </button>
+          
+          <button id="predict-btn" class="btn btn-primary" title="Predict drawn digit">
+            <span class="btn-text">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polygon points="5 3 19 12 5 21 5 3"></polygon>
+              </svg>
+              Predict Digit
+            </span>
+            <span class="btn-loader" style="display: none;">
+              <span class="spinner"></span> Analyzing...
+            </span>
+          </button>
+        </div>
+
+        <div class="tips-box">
+          <div class="tip-icon">💡</div>
+          <div class="tip-text">
+            <strong>Drawing Tip:</strong> Draw a clean digit. Our MNIST preprocessing engine isolates the bounding box, preserves aspect ratio, and centers the digit by Center of Mass.
+          </div>
+        </div>
+      </section>
+
+      <!-- Right Column: Results & Probability Distribution -->
+      <section class="card results-section">
+        <div class="card-header">
+          <div class="card-title-group">
+            <h2 class="card-title">Prediction Results</h2>
+            <span class="badge" id="latency-badge" style="display:none;">0 ms</span>
+          </div>
+        </div>
+
+        <!-- Hero Prediction Banner -->
+        <div class="prediction-hero" id="prediction-hero">
+          <div class="placeholder-state" id="hero-placeholder">
+            <div class="pulse-icon">?</div>
+            <p>Draw a digit and click <strong>Predict Digit</strong> to view AI inference</p>
+          </div>
+
+          <div class="result-state" id="hero-result" style="display: none;">
+            <div class="prediction-badge-wrapper">
+              <div class="prediction-label">PREDICTED DIGIT</div>
+              <div class="prediction-digit" id="predicted-digit">-</div>
+            </div>
+            <div class="prediction-meta">
+              <div class="meta-item">
+                <span class="meta-label">Confidence</span>
+                <span class="meta-val highlight" id="confidence-score">0.0%</span>
+              </div>
+              <div class="meta-item">
+                <span class="meta-label">Model Architecture</span>
+                <span class="meta-val">MLP 784→128→64→10</span>
+              </div>
+              <div class="meta-item" id="preprocessed-preview-container" style="display:none;">
+                <span class="meta-label">MNIST Input (28×28)</span>
+                <div class="preview-box">
+                  <img id="preprocessed-preview" alt="Preprocessed digit" width="56" height="56" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Probabilities Distribution List -->
+        <div class="distribution-card">
+          <div class="distribution-header">
+            <h3 class="section-subtitle">Class Probabilities (0–9)</h3>
+            <span class="distribution-info">Softmax output</span>
+          </div>
+
+          <div class="prob-list" id="prob-list">
+            <!-- Dynamically generated rows for 0-9 -->
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Preprocessing Pipeline Debugger Section -->
+    <section class="card debug-section" id="debug-section">
+      <div class="card-header">
+        <div class="card-title-group">
+          <h2 class="card-title">Image Preprocessing Pipeline Debugger</h2>
+          <span class="badge badge-debug">Debug Inspector</span>
+        </div>
+        <div class="debug-status-badge">
+          <span class="status-indicator-dot"></span>
+          <span id="norm-badge-text">Awaiting input</span>
+        </div>
+      </div>
+
+      <!-- 4 Stages Grid -->
+      <div class="pipeline-grid">
+        <!-- Stage 1: Original Canvas -->
+        <div class="pipeline-card">
+          <div class="pipeline-step-badge">1. Original Canvas</div>
+          <div class="pipeline-img-frame">
+            <img id="debug-orig-img" src="" alt="Original Canvas" style="display: none;" />
+            <span class="pipeline-empty-text" id="empty-stage-1">No drawing</span>
+          </div>
+          <div class="pipeline-meta" id="debug-orig-meta">280 × 280 px</div>
+        </div>
+
+        <!-- Stage 2: Cropped Digit -->
+        <div class="pipeline-card">
+          <div class="pipeline-step-badge">2. Cropped Bounding Box</div>
+          <div class="pipeline-img-frame">
+            <img id="debug-crop-img" src="" alt="Cropped Digit" style="display: none;" />
+            <span class="pipeline-empty-text" id="empty-stage-2">No drawing</span>
+          </div>
+          <div class="pipeline-meta" id="debug-crop-meta">Isolated Bounds: -</div>
+        </div>
+
+        <!-- Stage 3: Resized 20x20 -->
+        <div class="pipeline-card">
+          <div class="pipeline-step-badge">3. Resized (~20×20)</div>
+          <div class="pipeline-img-frame">
+            <img id="debug-resize-img" src="" alt="Resized Digit" style="display: none;" />
+            <span class="pipeline-empty-text" id="empty-stage-3">No drawing</span>
+          </div>
+          <div class="pipeline-meta" id="debug-resize-meta">Aspect Preserved: -</div>
+        </div>
+
+        <!-- Stage 4: Final 28x28 MNIST Input -->
+        <div class="pipeline-card highlight-card">
+          <div class="pipeline-step-badge">4. Final MNIST (28×28)</div>
+          <div class="pipeline-img-frame">
+            <img id="debug-final-img" src="" alt="Final MNIST 28x28" style="display: none;" />
+            <span class="pipeline-empty-text" id="empty-stage-4">No drawing</span>
+          </div>
+          <div class="pipeline-meta" id="debug-final-meta">Final CoM: (13.50, 13.50)</div>
+        </div>
+      </div>
+
+      <!-- Center of Mass Alignment & Translation Details -->
+      <div class="com-panel">
+        <h3 class="stats-heading">Center of Mass Alignment &amp; Translation Inspector</h3>
+        <div class="stats-grid com-grid">
+          <div class="stat-card">
+            <span class="stat-name">Original CoM</span>
+            <span class="stat-value" id="stat-orig-com">-</span>
+            <span class="stat-sub">Cropped (20×20) CoM</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-name">Translation (dx, dy)</span>
+            <span class="stat-value" id="stat-translation">-</span>
+            <span class="stat-sub">Applied Translation</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-name">Final 28×28 CoM</span>
+            <span class="stat-value highlight-green" id="stat-final-com">-</span>
+            <span class="stat-sub">Target: (13.50, 13.50)</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-name">Final Bounding Box</span>
+            <span class="stat-value" id="stat-final-bbox">-</span>
+            <span class="stat-sub">[xmin, ymin, xmax, ymax]</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-name">Inside Bounds</span>
+            <span class="stat-value highlight-green" id="stat-bounds">Guaranteed</span>
+            <span class="stat-sub">Range [0, 27]</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Pixel Values & Normalization Stats -->
+      <div class="stats-panel">
+        <h3 class="stats-heading">Pixel Values &amp; Normalization Verification</h3>
+        <div class="stats-grid">
+          <div class="stat-card">
+            <span class="stat-name">Pixel Min</span>
+            <span class="stat-value" id="stat-min">-</span>
+            <span class="stat-sub">Expected &ge; 0.0</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-name">Pixel Max</span>
+            <span class="stat-value highlight-green" id="stat-max">-</span>
+            <span class="stat-sub">Expected &le; 1.0</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-name">Pixel Mean</span>
+            <span class="stat-value" id="stat-mean">-</span>
+            <span class="stat-sub">Stroke Intensity</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-name">Tensor Shape</span>
+            <span class="stat-value" id="stat-shape">(1, 1, 28, 28)</span>
+            <span class="stat-sub">PyTorch Input</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-name">Data Type</span>
+            <span class="stat-value" id="stat-dtype">torch.float32</span>
+            <span class="stat-sub">Normalized Float</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-name">Normalization Range</span>
+            <span class="stat-value highlight-green" id="stat-norm">Awaiting input</span>
+            <span class="stat-sub">Strict [0.0, 1.0]</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <p>Handwritten Digit Recognition System · Built with <strong>FastAPI</strong> &amp; <strong>PyTorch</strong> · Ready for Render Deployment</p>
+    </footer>
+
+    <!-- Toast notification -->
+    <div id="toast" class="toast"></div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
